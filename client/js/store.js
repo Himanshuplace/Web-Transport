@@ -38,9 +38,43 @@ class CricketStore {
 
   // ── Getters ───────────────────────────────────────────────────────────────
 
-  getMatch(matchId)   { return this._matches.get(matchId) || null; }
-  getMatchList()      { return this._matchList; }
-  getStatus()         { return this._connectionStatus; }
+  getMatch(matchId) { return this._matches.get(matchId) || null; }
+
+  /**
+   * Returns summary objects for all matches, always using the freshest data.
+   *
+   * WHY not just return `_matchList`?
+   *   `_matchList` is seeded from MATCH_LIST datagrams (summary objects).
+   *   Once MATCH_STATE and SCORE_UPDATE messages arrive, the richer data lives
+   *   in `_matches`.  Deriving summaries from `_matches` ensures the match
+   *   tabs always show the latest run/wicket count.
+   *
+   *   We normalise team1/team2 to shortName strings here so that renderMatchTabs
+   *   doesn't need to handle both "string" and "object with .shortName" cases.
+   */
+  getMatchList() {
+    if (this._matches.size === 0) return this._matchList;
+
+    return Array.from(this._matches.values()).map(m => {
+      // team1/team2 is a string (shortName) in summaries but a full object in
+      // MATCH_STATE — normalise to string for the tab renderer.
+      const t1 = typeof m.team1 === 'string' ? m.team1 : m.team1?.shortName || '';
+      const t2 = typeof m.team2 === 'string' ? m.team2 : m.team2?.shortName || '';
+      const liveScore = m._liveScore;
+
+      return {
+        matchId: m.matchId,
+        title:   m.title || `${t1} vs ${t2}`,
+        team1:   t1,
+        team2:   t2,
+        status:  m.status,
+        score:   liveScore ? `${liveScore.runs}/${liveScore.wickets}` : (m.score || '—'),
+        overs:   liveScore ? liveScore.overs : (m.overs || '—'),
+      };
+    });
+  }
+
+  getStatus() { return this._connectionStatus; }
   getActiveMatchId()  { return this._activeMatchId; }
   getActiveMatch()    { return this._matches.get(this._activeMatchId) || null; }
 

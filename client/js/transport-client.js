@@ -287,17 +287,32 @@ class CricketTransportClient {
   /**
    * Reads replies from the server on our bidirectional command stream.
    * (MATCH_STATE after SUBSCRIBE, ERROR responses, etc.)
+   *
+   * WHY a loop here?
+   *   The bidi stream stays open for the session's lifetime.  We subscribe
+   *   to multiple matches in sequence — each SUBSCRIBE triggers one MATCH_STATE
+   *   reply.  Without looping we'd only catch the first reply and miss the rest.
+   *
+   *   Each `writer.write()` on the server maps to one chunk on the client side
+   *   because WebTransport preserves write boundaries within a single stream
+   *   (unlike TCP/WebSocket which can merge small writes).  So one chunk = one
+   *   complete JSON message — no need to reassemble across reads.
    */
   async _readBidiReplies(readable) {
-    const data = await this._consumeStream(readable);
+    const reader = readable.getReader();
     try {
-      this._onMessage(decode(data));
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+        try {
+          this._onMessage(decode(chunk));
+        } catch (err) {
+          console.warn('[wt] Failed to decode bidi reply:', err);
+        }
+      }
     } catch (err) {
-      console.warn('[wt] Failed to decode bidi reply:', err);
+      if (!this._stopped) console.warn('[wt] Bidi reply reader error:', err);
     }
-    // Note: the server keeps the bidi stream open; we'd need to loop here
-    // for a production client.  For simplicity we handle one reply per open.
-    // See: _readIncomingStreams handles subsequent server → client messages.
   }
 
   /**

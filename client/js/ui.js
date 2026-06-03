@@ -42,9 +42,8 @@ function renderMatchTabs(matches, activeMatchId, onSelect) {
     tab.className = 'match-tab' + (match.matchId === activeMatchId ? ' active' : '');
 
     const statusDot = match.status === 'IN_PROGRESS' ? '<span class="live-dot"></span>' : '';
-    const score     = match._liveScore
-      ? `${match._liveScore.runs}/${match._liveScore.wickets}`
-      : (match.score || '—');
+    // `score` is already normalised by store.getMatchList() — just use it directly.
+    const score = match.score || '—';
 
     tab.innerHTML = `
       <span class="tab-teams">${statusDot}${match.team1} vs ${match.team2}</span>
