@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!--
+  index.html — Cricket Score Engine Dashboard
+
+  ARCHITECTURE OVERVIEW:
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Browser                                                    │
+  │  ┌─────────────────────────────────────────────────────┐   │
+  │  │  app.js ←→ CricketTransportClient (transport-client.js)│  │
+  │  │               ↕  WebTransport (QUIC/HTTP3)           │  │
+  │  │  CricketStore (store.js)                             │  │
+  │  │       ↓ observers                                   │  │
+  │  │  UI renderers (ui.js)  → DOM updates                │  │
+  │  └─────────────────────────────────────────────────────┘   │
+  └─────────────────────────────────────────────────────────────┘
+               ↕ UDP (QUIC)
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Server (Node.js)                                           │
+  │  transport-server.js  ← WebTransport sessions              │
+  │  match-manager.js     ← broadcasts ball events             │
+  │  cricket/match.js     ← state machine                      │
+  │  cricket/engine.js    ← simulation                         │
+  └─────────────────────────────────────────────────────────────┘
+
+  SCRIPT LOAD ORDER MATTERS:
+  1. protocol.js  — MSG constants + encode/decode  (no dependencies)
+  2. store.js     — CricketStore class             (no dependencies)
+  3. transport-client.js — WebTransport client     (needs protocol.js)
+  4. ui.js        — DOM render functions           (no dependencies)
+  5. app.js       — wires everything together      (needs all above)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cricket Live Score Engine — WebTransport</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Unsupported browser warning (hidden by default) ───────────────── -->
+<div id="wt-unsupported">
+  <strong>WebTransport Not Supported</strong>
+  This app requires WebTransport (HTTP/3 + QUIC).<br>
+  Please open it in <strong>Google Chrome 97+</strong> or <strong>Microsoft Edge 97+</strong>.<br><br>
+  <em>Note: Must be served over HTTPS or localhost.</em>
+</div>
+
+<!-- ── App shell ─────────────────────────────────────────────────────── -->
+<div id="app" class="app-shell">
+
+  <!-- ── Top header bar ─────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-title">
+      <span class="logo">🏏</span>
+      <span>Cricket Live Score Engine</span>
+      <span style="font-size:11px; color:#6b7280; font-weight:400">
+        Powered by WebTransport (HTTP/3)
+      </span>
+    </div>
+    <span id="connection-status" class="connection-status">Connecting…</span>
+  </header>
+
+  <!-- ── Match selector tabs ────────────────────────────────────────── -->
+  <!--
+    These tabs let you switch between the N simultaneous matches.
+    Each tab shows the team names, live score, and a blinking dot if live.
+    Rendered by ui.js → renderMatchTabs().
+  -->
+  <div id="match-tabs"></div>
+
+  <!-- ── Main content: scorecard + commentary ───────────────────────── -->
+  <div class="main-content">
+
+    <!-- ── Scorecard panel (left) ───────────────────────────────────── -->
+    <div class="scorecard-panel">
+      <!--
+        #scorecard — rendered by ui.js → renderScorecard().
+        Updated on every BALL_EVENT (every ~4 seconds).
+      -->
+      <div id="scorecard">
+        <div class="loading">Connecting to live scores…</div>
+      </div>
+
+      <!-- Fall of wickets section -->
+      <div class="panel-heading" style="margin-top:12px">Fall of Wickets</div>
+      <div id="fall-of-wickets">
+        <p class="no-data">No wickets yet</p>
+      </div>
+    </div>
+
+    <!-- ── Commentary panel (right) ─────────────────────────────────── -->
+    <div class="commentary-panel">
+      <div class="panel-heading">Ball-by-Ball Commentary</div>
+      <!--
+        #commentary-feed — updated by ui.js → addCommentary().
+        New entries are prepended (latest at top).
+        Commentary is colour-coded: green=4, red=6, red=W, purple=milestone.
+      -->
+      <div id="commentary-feed">
+        <div class="commentary-item">Commentary will appear here once the match starts…</div>
+      </div>
+    </div>
+
+  </div><!-- /.main-content -->
+</div><!-- /#app -->
+
+<!--
+  Scripts loaded in dependency order.
+  protocol.js defines MSG constants and encode/decode — must come first.
+  app.js references all other classes — must come last.
+-->
+<script src="js/protocol.js"></script>
+<script src="js/store.js"></script>
+<script src="js/transport-client.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

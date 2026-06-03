@@ -1,0 +1,4 @@
+node_modules/
+/tmp/cricket-wt-cert.json
+*.log
+.DS_Store

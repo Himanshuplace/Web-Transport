@@ -1,0 +1,24 @@
+{
+  "name": "cricket-score-engine",
+  "version": "1.0.0",
+  "description": "Live cricket score engine using WebTransport (HTTP/3 + QUIC)",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@fails-components/webtransport": "^1.6.3",
+    "@fails-components/webtransport-transport-http3-quiche": "^1.6.3",
+    "express": "^4.18.2",
+    "selfsigned": "^2.4.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
