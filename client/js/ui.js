@@ -18,15 +18,15 @@ function renderConnectionStatus(status) {
   if (!el) return;
 
   const configs = {
-    connecting:   { text: '⬤ Connecting…',         cls: 'status-connecting'   },
-    connected:    { text: '⬤ Live',                 cls: 'status-connected'    },
-    disconnected: { text: '⬤ Disconnected',         cls: 'status-disconnected' },
-    error:        { text: '⬤ Connection error',     cls: 'status-error'        },
+    connecting:   { text: 'Connecting…',     cls: 'status-connecting'   },
+    connected:    { text: 'Live',             cls: 'status-connected'    },
+    disconnected: { text: 'Disconnected',     cls: 'status-disconnected' },
+    error:        { text: 'Connection error', cls: 'status-error'        },
   };
 
   const cfg = configs[status] || configs.disconnected;
-  el.textContent = cfg.text;
-  el.className   = 'connection-status ' + cfg.cls;
+  el.className = 'connection-status ' + cfg.cls;
+  el.innerHTML = `<span class="status-dot"></span>${cfg.text}`;
 }
 
 // ── Match selector tabs ────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ function renderScorecard(match) {
   }
 
   const headerHtml = `
-    <div class="scorecard-header" style="border-left: 4px solid ${battingTeam?.color || '#3b82f6'}">
+    <div class="scorecard-header">
       <div class="match-meta">
         <span class="venue-name">${escapeHtml(match.venue?.name || '')}</span>
         <span class="innings-label">Innings ${match.currentInnings}</span>

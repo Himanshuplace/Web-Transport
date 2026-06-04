@@ -2,119 +2,114 @@
 <!--
   index.html — Cricket Score Engine Dashboard
 
-  ARCHITECTURE OVERVIEW:
-  ┌─────────────────────────────────────────────────────────────┐
-  │  Browser                                                    │
-  │  ┌─────────────────────────────────────────────────────┐   │
-  │  │  app.js ←→ CricketTransportClient (transport-client.js)│  │
-  │  │               ↕  WebTransport (QUIC/HTTP3)           │  │
-  │  │  CricketStore (store.js)                             │  │
-  │  │       ↓ observers                                   │  │
-  │  │  UI renderers (ui.js)  → DOM updates                │  │
-  │  └─────────────────────────────────────────────────────┘   │
-  └─────────────────────────────────────────────────────────────┘
-               ↕ UDP (QUIC)
-  ┌─────────────────────────────────────────────────────────────┐
-  │  Server (Node.js)                                           │
-  │  transport-server.js  ← WebTransport sessions              │
-  │  match-manager.js     ← broadcasts ball events             │
-  │  cricket/match.js     ← state machine                      │
-  │  cricket/engine.js    ← simulation                         │
-  └─────────────────────────────────────────────────────────────┘
-
-  SCRIPT LOAD ORDER MATTERS:
-  1. protocol.js  — MSG constants + encode/decode  (no dependencies)
-  2. store.js     — CricketStore class             (no dependencies)
-  3. transport-client.js — WebTransport client     (needs protocol.js)
-  4. ui.js        — DOM render functions           (no dependencies)
-  5. app.js       — wires everything together      (needs all above)
+  SCRIPT LOAD ORDER (dependency chain):
+    1. protocol.js         — MSG constants + encode/decode  (no deps)
+    2. store.js            — CricketStore class             (no deps)
+    3. transport-client.js — WebTransport client            (needs protocol.js)
+    4. ui.js               — DOM render functions           (no deps)
+    5. app.js              — wires everything together      (needs all above)
 -->
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cricket Live Score Engine — WebTransport</title>
+  <title>Cricket Live · WebTransport</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- ── Unsupported browser warning (hidden by default) ───────────────── -->
+<!-- ── Unsupported browser banner (hidden by default) ─────────────────── -->
 <div id="wt-unsupported">
-  <strong>WebTransport Not Supported</strong>
+  <strong>WebTransport not supported</strong>
   This app requires WebTransport (HTTP/3 + QUIC).<br>
-  Please open it in <strong>Google Chrome 97+</strong> or <strong>Microsoft Edge 97+</strong>.<br><br>
-  <em>Note: Must be served over HTTPS or localhost.</em>
+  Open it in <strong>Google Chrome 97+</strong> or <strong>Microsoft Edge 97+</strong>.<br>
+  Must be served over HTTPS or localhost.
 </div>
 
-<!-- ── App shell ─────────────────────────────────────────────────────── -->
+<!-- ── App shell ──────────────────────────────────────────────────────── -->
 <div id="app" class="app-shell">
 
-  <!-- ── Top header bar ─────────────────────────────────────────────── -->
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
   <header class="header">
-    <div class="header-title">
-      <span class="logo">🏏</span>
-      <span>Cricket Live Score Engine</span>
-      <span style="font-size:11px; color:#6b7280; font-weight:400">
-        Powered by WebTransport (HTTP/3)
-      </span>
+    <div class="header-left">
+      <span class="header-logo">🏏</span>
+      <span class="header-title">Cricket Live</span>
+      <span class="header-sub">WebTransport · HTTP/3</span>
     </div>
-    <span id="connection-status" class="connection-status">Connecting…</span>
+    <div class="header-right">
+      <span id="connection-status" class="connection-status status-connecting">
+        <span class="status-dot"></span>Connecting…
+      </span>
+      <!-- Theme toggle: switches between dark and light -->
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle theme">
+        🌙
+      </button>
+    </div>
   </header>
 
-  <!-- ── Match selector tabs ────────────────────────────────────────── -->
-  <!--
-    These tabs let you switch between the N simultaneous matches.
-    Each tab shows the team names, live score, and a blinking dot if live.
-    Rendered by ui.js → renderMatchTabs().
-  -->
+  <!-- ── Match selector tabs ─────────────────────────────────────────── -->
   <div id="match-tabs"></div>
 
-  <!-- ── Main content: scorecard + commentary ───────────────────────── -->
+  <!-- ── Main content ────────────────────────────────────────────────── -->
   <div class="main-content">
 
-    <!-- ── Scorecard panel (left) ───────────────────────────────────── -->
+    <!-- ── Scorecard (left) ──────────────────────────────────────────── -->
     <div class="scorecard-panel">
-      <!--
-        #scorecard — rendered by ui.js → renderScorecard().
-        Updated on every BALL_EVENT (every ~4 seconds).
-      -->
       <div id="scorecard">
         <div class="loading">Connecting to live scores…</div>
       </div>
 
-      <!-- Fall of wickets section -->
-      <div class="panel-heading" style="margin-top:12px">Fall of Wickets</div>
+      <div class="panel-heading-inline" style="padding:0 2px; margin: 4px 0 6px;">Fall of Wickets</div>
       <div id="fall-of-wickets">
         <p class="no-data">No wickets yet</p>
       </div>
     </div>
 
-    <!-- ── Commentary panel (right) ─────────────────────────────────── -->
+    <!-- ── Commentary (right) ────────────────────────────────────────── -->
     <div class="commentary-panel">
-      <div class="panel-heading">Ball-by-Ball Commentary</div>
-      <!--
-        #commentary-feed — updated by ui.js → addCommentary().
-        New entries are prepended (latest at top).
-        Commentary is colour-coded: green=4, red=6, red=W, purple=milestone.
-      -->
+      <div class="panel-heading">Commentary</div>
       <div id="commentary-feed">
         <div class="commentary-item">Commentary will appear here once the match starts…</div>
       </div>
     </div>
 
-  </div><!-- /.main-content -->
-</div><!-- /#app -->
+  </div>
+</div>
 
-<!--
-  Scripts loaded in dependency order.
-  protocol.js defines MSG constants and encode/decode — must come first.
-  app.js references all other classes — must come last.
--->
 <script src="js/protocol.js"></script>
 <script src="js/store.js"></script>
 <script src="js/transport-client.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/app.js"></script>
+
+<!-- Theme toggle logic (runs after DOM is ready) -->
+<script>
+  (function () {
+    const html   = document.documentElement;
+    const btn    = document.getElementById('theme-toggle');
+    const DARK   = 'dark';
+    const LIGHT  = 'light';
+    const KEY    = 'cricket-theme';
+
+    // Initialise from localStorage, then system preference, then default dark
+    const saved  = localStorage.getItem(KEY);
+    const prefer = window.matchMedia('(prefers-color-scheme: light)').matches ? LIGHT : DARK;
+    const init   = saved || prefer;
+    apply(init);
+
+    btn.addEventListener('click', () => {
+      const next = html.dataset.theme === DARK ? LIGHT : DARK;
+      apply(next);
+      localStorage.setItem(KEY, next);
+    });
+
+    function apply(theme) {
+      html.dataset.theme  = theme;
+      btn.textContent     = theme === DARK ? '☀️' : '🌙';
+      btn.title           = theme === DARK ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+  })();
+</script>
 
 </body>
 </html>
