@@ -1,0 +1,65 @@
+{
+  "name": "Cricket Score Engine — WebTransport",
+
+  // Node.js 22 (LTS) on Debian Bullseye.
+  // The @fails-components/webtransport package ships prebuilt binaries for
+  // linux-x64, so npm install works without needing to compile C++.
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bullseye",
+
+  // Install openssl (needed by cert.js to generate ECDSA P-256 certificates)
+  // and lsof (useful for debugging port conflicts).
+  "onCreateCommand": "sudo apt-get update -qq && sudo apt-get install -y openssl lsof",
+
+  // npm ci (clean install from lockfile) runs once after the container is built.
+  // Uses --ignore-scripts to skip any unsafe post-install hooks from dependencies,
+  // then runs the explicit rebuild for the native quiche binary.
+  "postCreateCommand": "npm ci",
+
+  // ── Port forwarding ──────────────────────────────────────────────────────
+  // Port 3000 (TCP)  → Express HTTP server: dashboard HTML + /api/server-info
+  // Port 4433 (UDP)  → WebTransport/QUIC server: live score stream
+  //
+  // ⚠ Codespaces port forwarding is TCP-only.  Port 3000 (the dashboard)
+  //   will be accessible in your browser, but the WebTransport connection
+  //   (UDP:4433) will NOT reach the browser from outside the container.
+  //
+  //   What DOES work in Codespaces:
+  //     ✅  node test/wt-client.js   — Node.js client (loopback, inside container)
+  //     ✅  node test/verify-cert.js — cert diagnostic (loopback)
+  //     ✅  http://localhost:3000     — dashboard HTML loads (no live scores)
+  //     ❌  browser WebTransport      — UDP not forwarded by Codespaces tunnels
+  "forwardPorts": [3000, 4433],
+  "portsAttributes": {
+    "3000": {
+      "label": "Dashboard (HTTP)",
+      "onAutoForward": "openBrowser",
+      "protocol": "http"
+    },
+    "4433": {
+      "label": "WebTransport (QUIC/UDP — loopback only)",
+      "onAutoForward": "silent",
+      "protocol": "http"
+    }
+  },
+
+  // ── VS Code extensions ───────────────────────────────────────────────────
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",           // ESLint inline errors
+        "esbenp.prettier-vscode",           // Prettier formatting
+        "ms-vscode.js-debug-nightly",       // Enhanced Node.js debugger
+        "humao.rest-client"                 // Send HTTP requests to /api/server-info
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "node.autoAttach": "on"
+      }
+    }
+  },
+
+  // Run as non-root (the devcontainers/javascript-node image ships "node" user)
+  "remoteUser": "node"
+}

@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: install",
+      "type": "shell",
+      "command": "npm ci",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Start Server",
+      "type": "shell",
+      "command": "node server/index.js",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^\\[(.*)\\] ERROR: (.*)$", "file": 1, "message": 2 },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Cricket Score Engine",
+          "endsPattern": "Server ready"
+        }
+      }
+    },
+    {
+      "label": "Run Test Client (60s)",
+      "type": "shell",
+      "command": "node test/wt-client.js --duration=60",
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "dependsOn": "Start Server"
+    },
+    {
+      "label": "Verify Cert",
+      "type": "shell",
+      "command": "node test/verify-cert.js",
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

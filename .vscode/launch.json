@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Start the full cricket score engine (cert + matches + WebTransport + HTTP)
+      "name": "Start Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/index.js",
+      "runtimeArgs": ["--experimental-vm-modules"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "restart": false
+    },
+    {
+      // Run the Node.js test client — connects via WebTransport from inside the
+      // container (loopback), prints live ball-by-ball events to the terminal.
+      // Server must already be running (use "Start Server" config above first).
+      "name": "Test Client (60s)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/test/wt-client.js",
+      "args": ["--duration=60"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      // Quick diagnostic: verifies cert fingerprint and WebTransport connection.
+      // Server must be running first.
+      "name": "Verify Cert",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/test/verify-cert.js",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ],
+  "compounds": [
+    {
+      // Launches both server + test client together.
+      // The test client waits for quicheLoaded and fetches /api/server-info,
+      // so the slight startup delay of the server is usually enough.
+      // If it connects before the server is ready, just re-run "Test Client".
+      "name": "Server + Test Client",
+      "configurations": ["Start Server", "Test Client (60s)"],
+      "stopAll": true
+    }
+  ]
+}
