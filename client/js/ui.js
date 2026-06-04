@@ -90,8 +90,8 @@ function renderScorecard(match) {
       ? match.team1?.name : match.team2?.name;
     tossHtml = `
       <div class="toss-info">
-        🪙 Toss: <strong>${escapeHtml(tossWinner || '')}</strong>
-        won the toss and elected to
+        Toss: <strong>${escapeHtml(tossWinner || '')}</strong>
+        won and elected to
         <strong>${match.toss.decision === 'bat' ? 'bat' : 'bowl'}</strong> first
       </div>
     `;
@@ -170,8 +170,7 @@ function renderBattingTable(inn) {
   const batRows = activeBatsmen.map(b => `
     <tr class="${b.status === 'batting' ? 'batting-now' : ''}">
       <td class="player-name">
-        ${b.status === 'batting' ? '<span class="bat-icon">🏏</span> ' : ''}
-        ${escapeHtml(b.name)}
+        ${escapeHtml(b.name)}${b.status === 'batting' ? ' *' : ''}
         ${b.dismissal ? `<div class="dismissal">${escapeHtml(b.dismissal)}</div>` : ''}
       </td>
       <td class="stat-cell">${b.runs}</td>
@@ -239,7 +238,7 @@ function renderBowlingTable(inn) {
     return `
       <tr class="${isCurrent ? 'bowling-now' : ''}">
         <td class="player-name">
-          ${isCurrent ? '<span class="ball-icon">🎯</span> ' : ''}${escapeHtml(b.name)}
+          ${escapeHtml(b.name)}${isCurrent ? ' *' : ''}
         </td>
         <td class="stat-cell">${b.overs}</td>
         <td class="stat-cell">${b.maidens}</td>
@@ -381,20 +380,24 @@ function addCommentary(text, type = 'normal') {
 
 function renderFallOfWickets(match) {
   const container = document.getElementById('fall-of-wickets');
+  const heading   = document.getElementById('fow-heading');
   if (!container || !match) return;
 
   const curIdx = (match.currentInnings || 1) - 1;
   const curInn = match.innings?.[curIdx];
+
   if (!curInn?.fallOfWickets?.length) {
-    container.innerHTML = '<p class="no-data">No wickets yet</p>';
+    container.innerHTML = '';
+    if (heading) heading.style.display = 'none';
     return;
   }
 
-  const fowHtml = curInn.fallOfWickets.map(fw => `
-    <span class="fow-item">${fw.score} (${fw.batsman}, ${fw.over} ov)</span>
-  `).join(' • ');
+  if (heading) heading.style.display = 'block';
+  const fowHtml = curInn.fallOfWickets.map(fw =>
+    `<span class="fow-item">${fw.score} (${escapeHtml(fw.batsman)}, ${fw.over} ov)</span>`
+  ).join(' &nbsp;·&nbsp; ');
 
-  container.innerHTML = `<div class="fow-list">${fowHtml}</div>`;
+  container.innerHTML = `<div class="fow-list" style="padding:0 14px 10px">${fowHtml}</div>`;
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────

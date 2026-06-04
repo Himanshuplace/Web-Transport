@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <!--
-  index.html — Cricket Score Engine Dashboard
-
-  SCRIPT LOAD ORDER (dependency chain):
-    1. protocol.js         — MSG constants + encode/decode  (no deps)
-    2. store.js            — CricketStore class             (no deps)
-    3. transport-client.js — WebTransport client            (needs protocol.js)
-    4. ui.js               — DOM render functions           (no deps)
-    5. app.js              — wires everything together      (needs all above)
+  index.html — Cricket Score Engine
+  Script load order (dependency chain):
+    1. protocol.js         MSG constants + encode/decode
+    2. store.js            CricketStore
+    3. transport-client.js WebTransport connection
+    4. ui.js               DOM render functions
+    5. app.js              wires everything together
 -->
 <html lang="en" data-theme="dark">
 <head>
@@ -18,18 +17,13 @@
 </head>
 <body>
 
-<!-- ── Unsupported browser banner (hidden by default) ─────────────────── -->
 <div id="wt-unsupported">
   <strong>WebTransport not supported</strong>
-  This app requires WebTransport (HTTP/3 + QUIC).<br>
-  Open it in <strong>Google Chrome 97+</strong> or <strong>Microsoft Edge 97+</strong>.<br>
-  Must be served over HTTPS or localhost.
+  Requires Chrome 97+ or Edge 97+ over HTTPS or localhost.
 </div>
 
-<!-- ── App shell ──────────────────────────────────────────────────────── -->
 <div id="app" class="app-shell">
 
-  <!-- ── Header ─────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="header-left">
       <span class="header-logo">🏏</span>
@@ -38,38 +32,34 @@
     </div>
     <div class="header-right">
       <span id="connection-status" class="connection-status status-connecting">
-        <span class="status-dot"></span>Connecting…
+        <span class="status-dot"></span>Connecting
       </span>
-      <!-- Theme toggle: switches between dark and light -->
-      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle theme">
-        🌙
+      <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+        ☀
       </button>
     </div>
   </header>
 
-  <!-- ── Match selector tabs ─────────────────────────────────────────── -->
   <div id="match-tabs"></div>
 
-  <!-- ── Main content ────────────────────────────────────────────────── -->
   <div class="main-content">
 
-    <!-- ── Scorecard (left) ──────────────────────────────────────────── -->
     <div class="scorecard-panel">
       <div id="scorecard">
         <div class="loading">Connecting to live scores…</div>
       </div>
-
-      <div class="panel-heading-inline" style="padding:0 2px; margin: 4px 0 6px;">Fall of Wickets</div>
-      <div id="fall-of-wickets">
-        <p class="no-data">No wickets yet</p>
+      <div id="fall-of-wickets-wrap">
+        <div class="panel-heading-inline" id="fow-heading" style="padding:10px 14px 4px; display:none">
+          Fall of Wickets
+        </div>
+        <div id="fall-of-wickets"></div>
       </div>
     </div>
 
-    <!-- ── Commentary (right) ────────────────────────────────────────── -->
     <div class="commentary-panel">
       <div class="panel-heading">Commentary</div>
       <div id="commentary-feed">
-        <div class="commentary-item">Commentary will appear here once the match starts…</div>
+        <div class="commentary-item commentary-normal">Waiting for match data…</div>
       </div>
     </div>
 
@@ -82,31 +72,26 @@
 <script src="js/ui.js"></script>
 <script src="js/app.js"></script>
 
-<!-- Theme toggle logic (runs after DOM is ready) -->
 <script>
   (function () {
-    const html   = document.documentElement;
-    const btn    = document.getElementById('theme-toggle');
-    const DARK   = 'dark';
-    const LIGHT  = 'light';
-    const KEY    = 'cricket-theme';
+    var html = document.documentElement;
+    var btn  = document.getElementById('theme-toggle');
+    var KEY  = 'cricket-theme';
 
-    // Initialise from localStorage, then system preference, then default dark
-    const saved  = localStorage.getItem(KEY);
-    const prefer = window.matchMedia('(prefers-color-scheme: light)').matches ? LIGHT : DARK;
-    const init   = saved || prefer;
-    apply(init);
+    var saved   = localStorage.getItem(KEY);
+    var prefer  = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    apply(saved || prefer);
 
-    btn.addEventListener('click', () => {
-      const next = html.dataset.theme === DARK ? LIGHT : DARK;
+    btn.addEventListener('click', function () {
+      var next = html.dataset.theme === 'dark' ? 'light' : 'dark';
       apply(next);
       localStorage.setItem(KEY, next);
     });
 
     function apply(theme) {
-      html.dataset.theme  = theme;
-      btn.textContent     = theme === DARK ? '☀️' : '🌙';
-      btn.title           = theme === DARK ? 'Switch to light mode' : 'Switch to dark mode';
+      html.dataset.theme = theme;
+      btn.textContent    = theme === 'dark' ? '☀' : '☾';
+      btn.title          = theme === 'dark' ? 'Light mode' : 'Dark mode';
     }
   })();
 </script>
