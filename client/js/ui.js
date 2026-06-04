@@ -68,8 +68,8 @@ function renderScorecard(match) {
     return;
   }
 
-  const inn1 = match.innings?.[0];
-  const inn2 = match.innings?.[1];
+  const inn1   = match.innings?.[0];
+  const inn2   = match.innings?.[1];
   const curIdx = (match.currentInnings || 1) - 1;
   const curInn = match.innings?.[curIdx];
 
@@ -79,54 +79,91 @@ function renderScorecard(match) {
   }
 
   // ── Header: team names + score + overs ──────────────────────────────────
-  const battingTeam = match.innings?.[curIdx]?.battingTeamId === match.team1?.id
-    ? match.team1 : match.team2;
-  const bowlingTeam = battingTeam?.id === match.team1?.id ? match.team2 : match.team1;
+  const battingTeam = curInn.battingTeamId === match.team1?.id ? match.team1 : match.team2;
 
-  let headerHtml = `
-    <div class="scorecard-header" style="border-left: 4px solid ${battingTeam?.color || '#fff'}">
+  // ── Toss info strip ──────────────────────────────────────────────────────
+  // "Toss: Mumbai Stars won and chose to bat"
+  // This is a cricket-standard piece of info shown above every scorecard.
+  let tossHtml = '';
+  if (match.toss) {
+    const tossWinner = match.toss.winner === match.team1?.id
+      ? match.team1?.name : match.team2?.name;
+    tossHtml = `
+      <div class="toss-info">
+        🪙 Toss: <strong>${escapeHtml(tossWinner || '')}</strong>
+        won the toss and elected to
+        <strong>${match.toss.decision === 'bat' ? 'bat' : 'bowl'}</strong> first
+      </div>
+    `;
+  }
+
+  const headerHtml = `
+    <div class="scorecard-header" style="border-left: 4px solid ${battingTeam?.color || '#3b82f6'}">
       <div class="match-meta">
-        <span class="venue-name">${match.venue?.name || ''}</span>
+        <span class="venue-name">${escapeHtml(match.venue?.name || '')}</span>
         <span class="innings-label">Innings ${match.currentInnings}</span>
-        ${match.status === 'IN_PROGRESS' ? '<span class="live-badge">LIVE</span>' : ''}
-        ${match.status === 'INNINGS_BREAK' ? '<span class="break-badge">INNINGS BREAK</span>' : ''}
-        ${match.status === 'COMPLETED' ? '<span class="completed-badge">COMPLETED</span>' : ''}
+        ${match.status === 'IN_PROGRESS'   ? '<span class="live-badge">LIVE</span>'               : ''}
+        ${match.status === 'INNINGS_BREAK' ? '<span class="break-badge">INNINGS BREAK</span>'     : ''}
+        ${match.status === 'COMPLETED'     ? '<span class="completed-badge">COMPLETED</span>'     : ''}
       </div>
       <div class="main-score">
-        <span class="batting-team-name">${battingTeam?.name || ''}</span>
+        <span class="batting-team-name">${escapeHtml(battingTeam?.name || '')}</span>
         <span class="score-runs">${curInn.runs}/${curInn.wickets}</span>
         <span class="score-overs">(${curInn.overs}.${curInn.ballsInOver} ov)</span>
       </div>
       <div class="run-rates">
         <span>CRR: <strong>${curInn.runRate || '0.00'}</strong></span>
-        ${curInn.target ? `<span class="target">Target: <strong>${curInn.target}</strong></span>` : ''}
-        ${curInn.requiredRunRate ? `<span class="rrr">RRR: <strong>${curInn.requiredRunRate}</strong></span>` : ''}
-        ${curInn.target ? `<span class="needs">Need <strong>${Math.max(0, curInn.target - curInn.runs)}</strong> off <strong>${Math.max(0, (20 - curInn.overs) * 6 - curInn.ballsInOver)}</strong> balls</span>` : ''}
+        ${curInn.target
+          ? `<span class="target">Target: <strong>${curInn.target}</strong></span>` : ''}
+        ${curInn.requiredRunRate
+          ? `<span class="rrr">RRR: <strong>${curInn.requiredRunRate}</strong></span>` : ''}
+        ${curInn.target
+          ? `<span class="needs">Need <strong>${Math.max(0, curInn.target - curInn.runs)}</strong>
+             off <strong>${Math.max(0, (20 - curInn.overs) * 6 - curInn.ballsInOver)}</strong> balls</span>` : ''}
       </div>
     </div>
+    ${tossHtml}
   `;
 
-  // ── Previous innings summary (shown when 2nd innings live) ─────────────
+  // ── Previous innings summary (shown when 2nd innings is live) ─────────
   let prevInnHtml = '';
   if (inn1 && match.currentInnings === 2) {
     const prevTeam = inn1.battingTeamId === match.team1?.id ? match.team1 : match.team2;
     prevInnHtml = `
       <div class="prev-innings">
-        <span>${prevTeam?.name || ''} (1st innings): </span>
+        <span>${escapeHtml(prevTeam?.name || '')} (1st innings):</span>
         <strong>${inn1.runs}/${inn1.wickets}</strong>
         <span>(${inn1.overs}.${inn1.ballsInOver} ov)</span>
+        <span class="prev-extras">Extras: ${inn1.extras?.total || 0}</span>
       </div>
     `;
   }
 
   // ── Result banner ────────────────────────────────────────────────────────
-  let resultHtml = '';
-  if (match.result) {
-    resultHtml = `<div class="result-banner">${match.result.description}</div>`;
-  }
+  const resultHtml = match.result
+    ? `<div class="result-banner">${escapeHtml(match.result.description)}</div>`
+    : '';
+
+  // ── Current over ball display ─────────────────────────────────────────
+  const recentBallHtml = renderRecentBallsHtml(curInn.currentOverBalls || []);
 
   // ── Batting table ────────────────────────────────────────────────────────
-  const activeBatsmen = (curInn.battingLine || []).filter(b =>
+  const battingHtml = renderBattingTable(curInn);
+
+  // ── Bowling table ────────────────────────────────────────────────────────
+  const bowlingHtml = renderBowlingTable(curInn);
+
+  // ── Over-by-over log ─────────────────────────────────────────────────────
+  const overLogHtml = renderOverLog(curInn);
+
+  container.innerHTML = headerHtml + prevInnHtml + resultHtml
+    + recentBallHtml + battingHtml + bowlingHtml + overLogHtml;
+}
+
+// ── Batting table ──────────────────────────────────────────────────────────
+
+function renderBattingTable(inn) {
+  const activeBatsmen = (inn.battingLine || []).filter(b =>
     b.status === 'batting' || b.status === 'out'
   );
 
@@ -134,8 +171,8 @@ function renderScorecard(match) {
     <tr class="${b.status === 'batting' ? 'batting-now' : ''}">
       <td class="player-name">
         ${b.status === 'batting' ? '<span class="bat-icon">🏏</span> ' : ''}
-        ${b.name}
-        ${b.dismissal ? `<div class="dismissal">${b.dismissal}</div>` : ''}
+        ${escapeHtml(b.name)}
+        ${b.dismissal ? `<div class="dismissal">${escapeHtml(b.dismissal)}</div>` : ''}
       </td>
       <td class="stat-cell">${b.runs}</td>
       <td class="stat-cell">${b.balls}</td>
@@ -145,29 +182,64 @@ function renderScorecard(match) {
     </tr>
   `).join('');
 
-  const battingHtml = `
+  // ── Extras row — always shown in cricket scorecards ─────────────────────
+  // Standard format: Extras (W x, NB y) — Total z
+  const ex   = inn.extras || {};
+  const extParts = [];
+  if (ex.wides   > 0) extParts.push(`w ${ex.wides}`);
+  if (ex.noBalls > 0) extParts.push(`nb ${ex.noBalls}`);
+  if (ex.byes    > 0) extParts.push(`b ${ex.byes}`);
+  if (ex.legByes > 0) extParts.push(`lb ${ex.legByes}`);
+  const extStr = extParts.length ? ` (${extParts.join(', ')})` : '';
+
+  const extrasRow = `
+    <tr class="extras-row">
+      <td class="player-name extras-label">Extras${extStr}</td>
+      <td class="stat-cell extras-total" colspan="5">${ex.total || 0}</td>
+    </tr>
+    <tr class="total-row">
+      <td class="player-name total-label">Total</td>
+      <td class="stat-cell total-score" colspan="5">
+        ${inn.runs}/${inn.wickets}
+        <span class="total-meta">(${inn.overs}.${inn.ballsInOver} ov, RR: ${inn.runRate || '0.00'})</span>
+      </td>
+    </tr>
+  `;
+
+  // ── "Yet to bat" summary ─────────────────────────────────────────────────
+  const yetToBat = (inn.battingLine || []).filter(b => b.status === 'yet to bat');
+  const yetHtml = yetToBat.length
+    ? `<tr class="yet-to-bat-row"><td colspan="6" class="yet-label">
+         Yet to bat: ${yetToBat.map(b => escapeHtml(b.name)).join(', ')}
+       </td></tr>`
+    : '';
+
+  return `
     <div class="scorecard-section">
       <table class="stats-table">
         <thead>
-          <tr>
-            <th class="player-col">Batter</th>
+          <tr><th class="player-col">Batter</th>
             <th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th>
           </tr>
         </thead>
-        <tbody>${batRows}</tbody>
+        <tbody>${batRows}${extrasRow}${yetHtml}</tbody>
       </table>
     </div>
   `;
+}
 
-  // ── Bowling table ────────────────────────────────────────────────────────
-  const activeBowlers = (curInn.bowlingLine || []).filter(b => b.overs > 0);
+// ── Bowling table ──────────────────────────────────────────────────────────
+
+function renderBowlingTable(inn) {
+  const activeBowlers = (inn.bowlingLine || []).filter(b => b.overs > 0);
+  if (activeBowlers.length === 0) return '';
 
   const bowlRows = activeBowlers.map((b, i) => {
-    const isCurrent = i === curInn.currentBowlerIdx;
+    const isCurrent = i === inn.currentBowlerIdx;
     return `
       <tr class="${isCurrent ? 'bowling-now' : ''}">
         <td class="player-name">
-          ${isCurrent ? '<span class="ball-icon">🎯</span> ' : ''}${b.name}
+          ${isCurrent ? '<span class="ball-icon">🎯</span> ' : ''}${escapeHtml(b.name)}
         </td>
         <td class="stat-cell">${b.overs}</td>
         <td class="stat-cell">${b.maidens}</td>
@@ -178,12 +250,11 @@ function renderScorecard(match) {
     `;
   }).join('');
 
-  const bowlingHtml = `
+  return `
     <div class="scorecard-section">
       <table class="stats-table">
         <thead>
-          <tr>
-            <th class="player-col">Bowler</th>
+          <tr><th class="player-col">Bowler</th>
             <th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th>
           </tr>
         </thead>
@@ -191,34 +262,89 @@ function renderScorecard(match) {
       </table>
     </div>
   `;
-
-  // ── Recent balls (over-in-progress) ─────────────────────────────────────
-  const recentBallHtml = renderRecentBallsHtml(match.recentBalls || [], curInn.currentOverBalls || []);
-
-  container.innerHTML = headerHtml + prevInnHtml + resultHtml + recentBallHtml + battingHtml + bowlingHtml;
 }
 
-// ── Recent balls widget ────────────────────────────────────────────────────
+// ── Over-by-over log ───────────────────────────────────────────────────────
 
-function renderRecentBallsHtml(recentBalls, currentOverBalls) {
+/**
+ * Renders a compact over-by-over run summary.
+ *
+ * Each completed over shows:
+ *   Over 1: [ 0 1 4 0 W 1 ]  (6 ball symbols)
+ *
+ * WHY show this?
+ *   Classic cricket coverage always has an over-by-over breakdown.  It lets
+ *   you spot momentum shifts: a cluster of 4s/6s in one over, a maiden, etc.
+ *
+ * DEBUGGING tip:
+ *   If balls are missing or duplicated here, check `_applyBallResult` in
+ *   match.js — specifically the `inn.currentOverBalls` push logic.
+ */
+function renderOverLog(inn) {
+  const log = inn.overLog || [];
+  if (log.length === 0) return '';
+
+  const ballSymbol = (s) => {
+    let cls = 'ball-dot';
+    if (s === 'W')              cls = 'ball-wicket';
+    else if (s === '4')         cls = 'ball-four';
+    else if (s === '6')         cls = 'ball-six';
+    else if (s === 'Wd' || s === 'NB') cls = 'ball-extra';
+    else if (s !== '0')         cls = 'ball-runs';
+    return `<span class="ball-symbol ${cls} ball-sm">${s}</span>`;
+  };
+
+  // Show last 10 overs (oldest → newest)
+  const recent = log.slice(-10);
+
+  const rows = recent.map(ov => {
+    const ballsHtml = (ov.balls || []).map(ballSymbol).join('');
+    // Sum legal ball runs (excluding 'W', 'Wd', 'NB')
+    const runs = (ov.balls || []).reduce((s, b) => {
+      if (b === 'W' || b === 'Wd' || b === 'NB') return s;
+      return s + (Number(b) || 0);
+    }, 0);
+    const wickets = (ov.balls || []).filter(b => b === 'W').length;
+    return `
+      <tr>
+        <td class="over-num">Ov ${ov.over}</td>
+        <td class="over-balls">${ballsHtml}</td>
+        <td class="over-runs">${runs}${wickets ? ` <span class="over-wkt">(${wickets}W)</span>` : ''}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="scorecard-section over-log-section">
+      <div class="section-title">Over-by-Over</div>
+      <table class="over-log-table">
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── Recent balls (current over in progress) ────────────────────────────────
+
+function renderRecentBallsHtml(currentOverBalls) {
   const ballSymbolHtml = (symbol) => {
     let cls = 'ball-dot';
-    if (symbol === 'W')     cls = 'ball-wicket';
-    else if (symbol === '4') cls = 'ball-four';
-    else if (symbol === '6') cls = 'ball-six';
+    if (symbol === 'W')                    cls = 'ball-wicket';
+    else if (symbol === '4')               cls = 'ball-four';
+    else if (symbol === '6')               cls = 'ball-six';
     else if (symbol === 'Wd' || symbol === 'NB') cls = 'ball-extra';
-    else if (symbol !== '0') cls = 'ball-runs';
+    else if (symbol !== '0')               cls = 'ball-runs';
     return `<span class="ball-symbol ${cls}">${symbol}</span>`;
   };
 
-  const currentOverHtml = currentOverBalls.length > 0
-    ? `<div class="current-over">
-         <span class="over-label">This over:</span>
-         ${currentOverBalls.map(ballSymbolHtml).join('')}
-       </div>`
-    : '';
+  if (currentOverBalls.length === 0) return '';
 
-  return `<div class="recent-balls">${currentOverHtml}</div>`;
+  return `
+    <div class="recent-balls">
+      <span class="over-label">This over:</span>
+      ${currentOverBalls.map(ballSymbolHtml).join('')}
+    </div>
+  `;
 }
 
 // ── Commentary feed ────────────────────────────────────────────────────────

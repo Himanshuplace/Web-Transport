@@ -95,13 +95,24 @@ async function main() {
     });
   });
 
-  app.listen(HTTP_PORT, () => {
+  const httpServer = app.listen(HTTP_PORT, () => {
     console.log(`\n[http]  Dashboard   → http://localhost:${HTTP_PORT}`);
     console.log(`[http]  Server info → http://localhost:${HTTP_PORT}/api/server-info`);
     console.log(`[wt]    WebTransport → https://localhost:${WEBTRANSPORT_PORT}/cricket`);
     console.log(`[cert]  Fingerprint  → ${fingerprintHex}`);
     console.log('\n  Server ready.  Open http://localhost:3000 in Chrome/Edge.\n');
     console.log('='.repeat(60) + '\n');
+  });
+
+  // Graceful EADDRINUSE — port already in use, give clear instructions.
+  httpServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n[http] ERROR: Port ${HTTP_PORT} is already in use.`);
+      console.error(`       Kill the old server:  pkill -f "node server/index.js"`);
+      console.error(`       Then run again:        npm start\n`);
+      process.exit(1);
+    }
+    throw err;
   });
 
   process.on('SIGINT',  () => shutdown('SIGINT'));

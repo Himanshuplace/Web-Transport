@@ -253,6 +253,22 @@ body {
   text-align:    center;
 }
 
+/* ── Toss strip ────────────────────────────────────────────────────────── */
+
+.toss-info {
+  background:    var(--bg-secondary);
+  border-radius: 0 0 var(--radius) var(--radius);
+  color:         var(--text-muted);
+  font-size:     12px;
+  padding:       6px 14px;
+  margin-top:    -4px;
+  margin-bottom: 8px;
+}
+
+.toss-info strong { color: var(--text-secondary); }
+
+/* ── Previous innings bar ──────────────────────────────────────────────── */
+
 .prev-innings {
   background:    var(--bg-secondary);
   border-radius: var(--radius);
@@ -260,7 +276,13 @@ body {
   font-size:     13px;
   margin-bottom: 12px;
   padding:       8px 14px;
+  display:       flex;
+  gap:           8px;
+  flex-wrap:     wrap;
+  align-items:   center;
 }
+
+.prev-extras { color: var(--text-muted); font-size: 11px; margin-left: auto; }
 
 /* ── Stats tables ──────────────────────────────────────────────────────── */
 
@@ -317,6 +339,52 @@ body {
 }
 
 .bat-icon, .ball-icon { font-size: 14px; }
+
+/* ── Extras + Total rows in batting table ──────────────────────────────── */
+
+.extras-row td, .total-row td { border-top: 2px solid var(--border); }
+
+.extras-label, .total-label { color: var(--text-secondary); font-style: italic; font-size: 12px; }
+.extras-total, .total-score { color: var(--text-secondary); font-size: 12px; }
+
+.total-score { font-size: 14px !important; font-weight: 600; color: var(--text-primary) !important; }
+.total-meta  { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+
+/* "Yet to bat" row */
+.yet-to-bat-row td { border-top: 1px solid var(--border); }
+.yet-label { font-size: 11px; color: var(--text-muted); padding: 6px 12px !important; font-style: italic; }
+
+/* ── Over-by-over log ──────────────────────────────────────────────────── */
+
+.over-log-section { padding: 10px 14px; }
+
+.section-title {
+  font-size:   11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color:       var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.over-log-table {
+  border-collapse: collapse;
+  width:           100%;
+}
+
+.over-log-table td { padding: 3px 6px; vertical-align: middle; }
+
+.over-num  { font-size: 11px; color: var(--text-muted); white-space: nowrap; width: 40px; }
+.over-balls { display: flex; gap: 3px; flex-wrap: nowrap; }
+.over-runs  { font-size: 12px; color: var(--text-secondary); white-space: nowrap; padding-left: 8px !important; }
+.over-wkt   { color: var(--accent-red); font-size: 11px; }
+
+/* Smaller ball symbol variant for over log */
+.ball-sm {
+  width:  22px;
+  height: 22px;
+  font-size: 10px;
+}
 
 /* ── Recent balls ──────────────────────────────────────────────────────── */
 

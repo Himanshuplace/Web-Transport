@@ -8,10 +8,16 @@
  *   `serverCertificateHashes` option so Chrome/Edge will accept it WITHOUT
  *   adding it to the OS trust store.
  *
- * IMPORTANT CONSTRAINT:
+ * IMPORTANT CONSTRAINT — ECDSA P-256 required:
+ *   The quiche library's ChromiumWebTransportFingerprintProofVerifier (used
+ *   for fingerprint-pinned self-signed certs) only accepts ECDSA P-256 keys.
+ *   RSA certificates are silently rejected during the QUIC handshake, resulting
+ *   in "Opening handshake failed."  Always use ECDSA P-256 here.
+ *
+ * IMPORTANT CONSTRAINT — max 14 days validity:
  *   Certificates used with `serverCertificateHashes` must be valid for at most
- *   14 days (spec requirement).  We set validity to 14 days and regenerate
- *   automatically when the cached cert expires.
+ *   14 days (spec requirement).  We use 13 days with a 1-day early-renewal
+ *   buffer, regenerating automatically when the cache is about to expire.
  *
  * Debugging tip: If the browser throws "Certificate verification failed" or
  *   "Fingerprint mismatch", the cert was probably regenerated on the server
@@ -21,11 +27,11 @@
 
 import fs from 'fs';
 import crypto from 'crypto';
-import selfsigned from 'selfsigned';
+import { execSync } from 'child_process';
 import { CERT_VALIDITY_DAYS, CERT_CACHE_PATH } from './config.js';
 
 /**
- * Generates (or loads from cache) a self-signed TLS certificate.
+ * Generates (or loads from cache) an ECDSA P-256 self-signed TLS certificate.
  *
  * Returns:
  *   { cert: string, key: string, fingerprint: Buffer }
@@ -57,50 +63,77 @@ export function getOrCreateCert() {
     }
   }
 
-  // ── Generate a new self-signed certificate ─────────────────────────────────
-  // `selfsigned.generate` wraps the `node-forge` library to produce an X.509
-  // cert + private key pair.  The `days` option controls validity.
-  const attrs = [
-    { name: 'commonName',         value: 'localhost'          },
-    { name: 'organizationName',   value: 'CricketScoreEngine' },
-  ];
+  // ── Generate a new ECDSA P-256 self-signed certificate ────────────────────
+  //
+  // We use OpenSSL (via child_process) because Node.js has no built-in X.509
+  // certificate creation API, and the popular `selfsigned` npm package only
+  // supports RSA — which the quiche WebTransport fingerprint verifier rejects.
+  //
+  // The two-step process:
+  //   Step 1: Generate an ECDSA P-256 private key
+  //   Step 2: Self-sign an X.509 certificate valid for CERT_VALIDITY_DAYS days
+  const keyPath  = `${CERT_CACHE_PATH}.key.tmp`;
+  const certPath = `${CERT_CACHE_PATH}.cert.tmp`;
 
-  const pems = selfsigned.generate(attrs, {
-    days:      CERT_VALIDITY_DAYS,
-    algorithm: 'sha256',
-    keySize:   2048,
-    extensions: [
-      { name: 'subjectAltName', altNames: [
-          { type: 2, value: 'localhost' },
-          { type: 7, ip:    '127.0.0.1' },
-      ]},
-    ],
-  });
-
-  // ── Compute SHA-256 fingerprint ────────────────────────────────────────────
-  // The browser's WebTransport API expects the RAW DER-encoded certificate
-  // bytes hashed with SHA-256 — NOT the PEM string.
-  // Steps: strip PEM headers → base64-decode → hash with SHA-256.
-  const fingerprint = computeFingerprint(pems.cert);
-
-  // ── Cache to disk ──────────────────────────────────────────────────────────
-  const expiresAt = new Date(Date.now() + CERT_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
   try {
-    fs.writeFileSync(CERT_CACHE_PATH, JSON.stringify({
-      cert:           pems.cert,
-      key:            pems.private,
-      fingerprintHex: fingerprint.toString('hex'),
-      expiresAt:      expiresAt.toISOString(),
-    }));
-    console.log('[cert] New certificate cached at', CERT_CACHE_PATH);
+    // Step 1: Generate ECDSA P-256 private key
+    execSync(
+      `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "${keyPath}" 2>/dev/null`,
+      { stdio: 'pipe' }
+    );
+
+    // Step 2: Self-sign with SAN for both localhost and 127.0.0.1.
+    //   -days CERT_VALIDITY_DAYS  → validity window (max 14 for WebTransport)
+    //   -addext subjectAltName    → required; browsers reject certs without SAN
+    //   -addext basicConstraints  → CA:false marks this as a leaf cert (not CA)
+    execSync(
+      `openssl req -new -x509 -key "${keyPath}" -out "${certPath}" ` +
+      `-days ${CERT_VALIDITY_DAYS} ` +
+      `-subj "/CN=localhost" ` +
+      `-addext "subjectAltName=DNS:localhost,IP:127.0.0.1" ` +
+      `-addext "basicConstraints=CA:false" ` +
+      `2>/dev/null`,
+      { stdio: 'pipe' }
+    );
+
+    const key  = fs.readFileSync(keyPath, 'utf8');
+    const cert = fs.readFileSync(certPath, 'utf8');
+
+    // Clean up temp files
+    fs.unlinkSync(keyPath);
+    fs.unlinkSync(certPath);
+
+    // ── Compute SHA-256 fingerprint ──────────────────────────────────────────
+    // The browser's WebTransport API expects the RAW DER-encoded certificate
+    // bytes hashed with SHA-256 — NOT the PEM string.
+    // Steps: strip PEM headers → base64-decode → hash with SHA-256.
+    const fingerprint = computeFingerprint(cert);
+
+    // ── Cache to disk ────────────────────────────────────────────────────────
+    const expiresAt = new Date(Date.now() + CERT_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
+    try {
+      fs.writeFileSync(CERT_CACHE_PATH, JSON.stringify({
+        cert,
+        key,
+        fingerprintHex: fingerprint.toString('hex'),
+        expiresAt:      expiresAt.toISOString(),
+      }));
+      console.log('[cert] New certificate cached at', CERT_CACHE_PATH);
+    } catch (err) {
+      console.warn('[cert] Could not cache cert:', err.message);
+    }
+
+    console.log('[cert] Generated new ECDSA P-256 certificate (valid until', expiresAt.toISOString(), ')');
+    console.log('[cert] Fingerprint (SHA-256):', fingerprint.toString('hex'));
+
+    return { cert, key, fingerprint };
   } catch (err) {
-    console.warn('[cert] Could not cache cert:', err.message);
+    // Clean up temp files on error
+    try { fs.unlinkSync(keyPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(certPath); } catch { /* ignore */ }
+    throw new Error(`Certificate generation failed: ${err.message}\n` +
+      'Make sure OpenSSL is installed: apt install openssl  or  brew install openssl');
   }
-
-  console.log('[cert] Generated new self-signed certificate (valid until', expiresAt.toISOString(), ')');
-  console.log('[cert] Fingerprint (SHA-256):', fingerprint.toString('hex'));
-
-  return { cert: pems.cert, key: pems.private, fingerprint };
 }
 
 /**
