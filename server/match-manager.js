@@ -192,15 +192,19 @@ export class MatchManager {
    */
   async _broadcastDatagram(sessions, type, payload) {
     const data = encode(type, payload);
-    for (const session of sessions) {
-      try {
-        const writer = session.datagrams.writable.getWriter();
-        await writer.write(data);
-        writer.releaseLock();
-      } catch (err) {
-        if (!String(err.message).includes('closed')) {
-          console.warn('[manager] Datagram send failed:', err.message);
-        }
+    await Promise.allSettled(
+      [...sessions].map(s => this._sendViaDatagram(s, data))
+    );
+  }
+
+  async _sendViaDatagram(session, data) {
+    try {
+      const writer = session.datagrams.writable.getWriter();
+      await writer.write(data);
+      writer.releaseLock();
+    } catch (err) {
+      if (!String(err.message).includes('closed')) {
+        console.warn('[manager] Datagram send failed:', err.message);
       }
     }
   }

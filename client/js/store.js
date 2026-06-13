@@ -62,14 +62,27 @@ class CricketStore {
       const t2 = typeof m.team2 === 'string' ? m.team2 : m.team2?.shortName || '';
       const liveScore = m._liveScore;
 
+      // When a full scorecard is available, derive score from innings data
+      // rather than relying solely on the _liveScore datagram cache.
+      const curInnIdx = m.currentInnings != null ? m.currentInnings - 1 : 0;
+      const curInn    = m.innings?.[curInnIdx];
+
       return {
         matchId: m.matchId,
         title:   m.title || `${t1} vs ${t2}`,
         team1:   t1,
         team2:   t2,
         status:  m.status,
-        score:   liveScore ? `${liveScore.runs}/${liveScore.wickets}` : (m.score || '—'),
-        overs:   liveScore ? liveScore.overs : (m.overs || '—'),
+        score: liveScore
+          ? `${liveScore.runs}/${liveScore.wickets}`
+          : curInn
+            ? `${curInn.runs}/${curInn.wickets}`
+            : (m.score || '—'),
+        overs: liveScore
+          ? liveScore.overs
+          : curInn
+            ? `${curInn.overs}.${curInn.ballsInOver}`
+            : (m.overs || '—'),
       };
     });
   }
@@ -113,9 +126,13 @@ class CricketStore {
     // The server sends the full updated scorecard with every ball event,
     // so we just replace the stored state.  In a high-frequency system
     // you'd apply a diff instead to save allocation.
+    const existing = this._matches.get(matchId);
+    if (existing?._liveScore) scorecard._liveScore = existing._liveScore;
     this._matches.set(matchId, scorecard);
     this._emit('matchUpdated', matchId);
     this._emit('ballDelivered', matchId);
+    // Keep tab scores in sync even if a SCORE_UPDATE datagram was dropped
+    this._emit('scoreUpdated', matchId);
   }
 
   applyScoreUpdate(update) {

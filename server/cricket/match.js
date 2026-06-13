@@ -276,6 +276,10 @@ export class Match {
         balls:   [...inn.currentOverBalls],
       });
 
+      // A maiden is an over with no runs and no extras (wides/no-balls break maiden)
+      const isMaiden = inn.currentOverBalls.every(b => b === '0' || b === 'W');
+      if (isMaiden) bowler.maidens++;
+
       bowler.overs++;
       if (bowler.overs > 0) {
         bowler.economy = +((bowler.runs / bowler.overs)).toFixed(2);
@@ -320,6 +324,7 @@ export class Match {
     if (eligible.length === 0) {
       const fallback = inn.bowlingLine.find(b => b.overs < MAX_BOWLER_OVERS);
       if (!fallback) return;
+      inn.lastBowlerIdx    = inn.currentBowlerIdx;
       inn.currentBowlerIdx = inn.bowlingLine.indexOf(fallback);
     } else {
       const choice = eligible[Math.floor(Math.random() * eligible.length)];

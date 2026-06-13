@@ -37,19 +37,16 @@ window._wt    = transport;
 // ── Transport → Store: wire incoming messages ────────────────────────────
 transport.on('connect', () => {
   store.setConnectionStatus('connected');
-  renderConnectionStatus('connected');
   console.log('[app] WebTransport connected');
 });
 
 transport.on('disconnect', () => {
   store.setConnectionStatus('disconnected');
-  renderConnectionStatus('disconnected');
   console.log('[app] WebTransport disconnected — will retry');
 });
 
 transport.on('error', ({ message }) => {
   store.setConnectionStatus('error');
-  renderConnectionStatus('error');
   console.warn('[app] Transport error:', message);
 });
 
@@ -87,9 +84,11 @@ transport.on('message', (msg) => {
       // Update store with the full scorecard (comes with every ball)
       store.applyBallEvent(matchId, scorecard);
 
-      // Add commentary for this ball
-      const commentaryType = _commentaryType(ball);
-      addCommentary(ball.commentary, commentaryType);
+      // Only show commentary for the match currently on screen
+      if (matchId === store.getActiveMatchId()) {
+        const commentaryType = _commentaryType(ball);
+        addCommentary(ball.commentary, commentaryType);
+      }
 
       break;
     }
@@ -105,10 +104,13 @@ transport.on('message', (msg) => {
     case MSG.MATCH_STATUS: {
       store.applyMatchStatus(msg.payload);
 
-      if (msg.payload.status === 'INNINGS_BREAK') {
-        addCommentary(`INNINGS BREAK — 1st innings total: ${msg.payload.inn1Score}`, 'milestone');
-      } else if (msg.payload.status === 'COMPLETED') {
-        addCommentary(`MATCH OVER — ${msg.payload.result?.description}`, 'milestone');
+      // Only add milestone commentary for the active match
+      if (msg.payload.matchId === store.getActiveMatchId()) {
+        if (msg.payload.status === 'INNINGS_BREAK') {
+          addCommentary(`INNINGS BREAK — 1st innings total: ${msg.payload.inn1Score}`, 'milestone');
+        } else if (msg.payload.status === 'COMPLETED') {
+          addCommentary(`MATCH OVER — ${msg.payload.result?.description}`, 'milestone');
+        }
       }
       break;
     }
@@ -149,6 +151,9 @@ store.on('activeMatchChanged', (matchId) => {
     renderScorecard(match);
     renderFallOfWickets(match);
   }
+  // Clear the commentary feed — it belongs to one match at a time
+  const feed = document.getElementById('commentary-feed');
+  if (feed) feed.innerHTML = '';
 });
 
 store.on('matchUpdated', (matchId) => {

@@ -200,7 +200,9 @@ export function simulateBall(innings, batsman, bowler, fielders) {
     case OUTCOMES.WICKET: {
       result.isLegalBall = true;
       const dismissalType = weightedRandom(DISMISSAL_WEIGHTS);
-      const fielder = (dismissalType === DISMISSALS.CAUGHT || dismissalType === DISMISSALS.RUN_OUT)
+      const fielder = (dismissalType === DISMISSALS.CAUGHT ||
+                       dismissalType === DISMISSALS.RUN_OUT ||
+                       dismissalType === DISMISSALS.STUMPED)
         ? pickRandom(fielders) : null;
       result.wicket = { type: dismissalType, fielder, batsman, bowler };
       result.commentary = generateCommentary('wicket', bowler, batsman, { dismissalType, fielder });
