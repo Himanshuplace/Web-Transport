@@ -17,7 +17,7 @@
  *     1. Fetches /api/server-info to get the cert fingerprint + match list
  *     2. Opens a WebTransport connection using the certificate fingerprint
  *        (same technique as the browser — fingerprint-pinned self-signed cert)
- *     3. Reads the initial MATCH_LIST datagram
+ *     3. Reads the initial MATCH_LIST (now a reliable unidirectional stream)
  *     4. Subscribes to all matches via the bidirectional command stream
  *     5. Prints each BALL_EVENT and SCORE_UPDATE to the terminal
  *     6. Exits after `duration` seconds
@@ -174,14 +174,6 @@ async function readDatagrams(transport, scores) {
 
       const msg = decode(chunk);
 
-      if (msg.type === MSG.MATCH_LIST) {
-        // Initial match list arrived as datagram on connect
-        log(colored(C.blue, '[datagram] MATCH_LIST received'));
-        for (const m of msg.payload.matches) {
-          dim(`           ${m.matchId.slice(0, 8)}… ${m.title} — ${m.score}`);
-        }
-      }
-
       if (msg.type === MSG.SCORE_UPDATE) {
         const p = msg.payload;
         const s = scores[p.matchId];
@@ -250,6 +242,17 @@ async function readBidiReplies(readable, scores) {
 }
 
 function handleStreamMessage(msg, scores) {
+  if (msg.type === MSG.MATCH_LIST) {
+    // Initial match list now arrives on connect via a reliable unidirectional
+    // stream (it used to be a datagram, which could be dropped before the
+    // reader attached — leaving the client with no matches to subscribe to).
+    log(colored(C.blue, '[stream]  MATCH_LIST received'));
+    for (const m of msg.payload.matches) {
+      dim(`           ${m.matchId.slice(0, 8)}… ${m.title} — ${m.score}`);
+    }
+    return;
+  }
+
   const latency = msg.ts ? Date.now() - msg.ts : null;
   const latStr  = latency !== null ? colored(C.dim, ` (${latency}ms)`) : '';
 

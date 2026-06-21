@@ -46,8 +46,8 @@ function renderMatchTabs(matches, activeMatchId, onSelect) {
     const score = match.score || '—';
 
     tab.innerHTML = `
-      <span class="tab-teams">${statusDot}${match.team1} vs ${match.team2}</span>
-      <span class="tab-score">${score}</span>
+      <span class="tab-teams">${statusDot}${escapeHtml(match.team1)} vs ${escapeHtml(match.team2)}</span>
+      <span class="tab-score">${escapeHtml(score)}</span>
     `;
     tab.addEventListener('click', () => onSelect(match.matchId));
     container.appendChild(tab);

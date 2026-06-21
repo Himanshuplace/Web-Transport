@@ -103,9 +103,9 @@ Browser                                        Server
   │                                              │
   │  ①  Datagrams (unreliable, no ordering)      │
   │ ◄──────────────────────────────────────────  │  SCORE_UPDATE every ~4s
-  │ ◄──────────────────────────────────────────  │  MATCH_LIST on connect
   │                                              │
   │  ②  Unidirectional streams (reliable, ordered per stream)
+  │ ◄──────────────────────────────────────────  │  MATCH_LIST (once, on connect)
   │ ◄──────────────────────────────────────────  │  BALL_EVENT (new stream each ball)
   │ ◄──────────────────────────────────────────  │  MATCH_STATUS (innings break / end)
   │                                              │
@@ -151,7 +151,7 @@ server/
 client/
 ├── index.html            Single HTML page, loads scripts in dependency order
 └── js/
-    ├── protocol.js       Mirror of server/protocol.js (same MSG constants)
+    ├── protocol.js       Generated from server/protocol.js (same MSG constants)
     ├── transport-client.js  WebTransport connection + reconnect logic
     ├── store.js          Client-side state store with observer pattern
     ├── ui.js             Pure DOM rendering functions
@@ -326,7 +326,7 @@ app.js             → runs immediately (needs all of the above)
      ├── _readIncomingStreams()      ← starts reading BALL_EVENT streams
      └── _readDatagrams()           ← starts reading SCORE_UPDATE datagrams
 
-7. Server sends MATCH_LIST datagram immediately on connect
+7. Server sends MATCH_LIST over a reliable unidirectional stream on connect
      └── app.js MSG.MATCH_LIST handler:
            ├── store.setMatchList(matches)
            └── transport.subscribe(matchId)  for each match
@@ -346,7 +346,7 @@ store.js  CricketStore
 
   Internal state:
   ├── _matches: Map<matchId, fullMatchObject>   from MATCH_STATE + BALL_EVENT
-  ├── _matchList: Array<matchSummary>           from initial MATCH_LIST datagram
+  ├── _matchList: Array<matchSummary>           from initial MATCH_LIST stream
   ├── _activeMatchId: string                    which tab is selected
   └── _connectionStatus: 'connecting'|'connected'|'disconnected'|'error'
 

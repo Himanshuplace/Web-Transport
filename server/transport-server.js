@@ -8,7 +8,7 @@
  *   3. Accepts incoming WebTransport sessions on the /cricket path.
  *   4. Per session:
  *        a) Awaits session.ready (TLS + HTTP/3 CONNECT handshake).
- *        b) Sends MATCH_LIST immediately via datagram.
+ *        b) Sends MATCH_LIST immediately via a reliable unidirectional stream.
  *        c) Reads incoming bidirectional streams (SUBSCRIBE / UNSUBSCRIBE).
  *        d) Cleans up on session close.
  *
@@ -99,15 +99,25 @@ async function _handleSession(session, manager) {
   }
 
   log('Connected');
+  manager.addSession(session);
 
-  // ── Send MATCH_LIST immediately as a datagram ──────────────────────────
+  // ── Send MATCH_LIST immediately via a reliable unidirectional stream ────
+  // This is the client's ONLY bootstrap: app.js auto-subscribes to every match
+  // it learns from MATCH_LIST (it never sends GET_MATCHES on its own).  A
+  // datagram is the wrong channel here — datagrams are unreliable and can be
+  // dropped if they arrive before the client has attached its datagram reader
+  // (the client starts that reader last, after the handshake), which would
+  // leave the dashboard permanently empty.  A unidirectional stream is reliable
+  // and queued by QUIC, so it survives that startup race.  (SCORE_UPDATE still
+  // demonstrates datagrams.)
   try {
     const matchList = manager.getMatchList();
     const data      = encode(MSG.MATCH_LIST, { matches: matchList });
-    const writer    = session.datagrams.writable.getWriter();
+    const stream    = await session.createUnidirectionalStream();
+    const writer    = stream.getWriter();
     await writer.write(data);
-    writer.releaseLock();
-    log('Sent MATCH_LIST datagram');
+    await writer.close();
+    log('Sent MATCH_LIST stream');
   } catch (err) {
     log('Could not send initial MATCH_LIST:', err.message);
   }

@@ -23,6 +23,7 @@ import {
   BALL_INTERVAL_MS,
   INNINGS_BREAK_MS,
   MAX_CONCURRENT_MATCHES,
+  POST_MATCH_BREAK_MS,
 } from './config.js';
 
 export class MatchManager {
@@ -30,6 +31,7 @@ export class MatchManager {
     this.matches     = new Map();   // Map<matchId, Match>
     this.subscribers = new Map();   // Map<matchId, Set<Session>>
     this.timers      = new Map();   // Map<matchId, Timeout>
+    this.sessions    = new Set();   // all connected WebTransport sessions
   }
 
   start() {
@@ -64,7 +66,13 @@ export class MatchManager {
     this.subscribers.get(matchId)?.delete(session);
   }
 
+  /** Track a newly connected session so match-list changes can be pushed to it. */
+  addSession(session) {
+    this.sessions.add(session);
+  }
+
   removeSession(session) {
+    this.sessions.delete(session);
     for (const [matchId, subs] of this.subscribers) {
       if (subs.delete(session)) {
         console.log(`[manager] Session removed from match ${matchId}`);
@@ -152,7 +160,41 @@ export class MatchManager {
         result:    match.result,
         scorecard: match.toJSON(),
       });
+
+      // Stop this match's ticker now, then after a short post-match break (so the
+      // result stays on screen) replace it with a fresh match so the dashboard
+      // never goes idle.
+      clearInterval(this.timers.get(matchId));
+      this.timers.delete(matchId);
+      setTimeout(() => this._replaceMatch(matchId), POST_MATCH_BREAK_MS);
     }
+  }
+
+  /**
+   * Replaces a finished match with a brand-new one and tells every connected
+   * client (so they subscribe to the replacement and drop the finished match).
+   * Scheduled on a timer after a match completes — see _tick().
+   */
+  _replaceMatch(oldMatchId) {
+    // Guard: manager stopped (maps cleared) or already replaced → do nothing.
+    if (!this.matches.has(oldMatchId)) return;
+
+    // Remove the finished match, its (already-stopped) ticker, and subscriber set.
+    clearInterval(this.timers.get(oldMatchId));
+    this.timers.delete(oldMatchId);
+    this.matches.delete(oldMatchId);
+    this.subscribers.delete(oldMatchId);
+
+    // Spin up a fresh matchup to keep the dashboard live.
+    const [{ team1, team2, venue }] = getMatchups(1);
+    const match = new Match({ team1, team2, venue });
+    this.matches.set(match.matchId, match);
+    this.subscribers.set(match.matchId, new Set());
+    this._startTicker(match.matchId);
+    console.log(`[manager] Match ${oldMatchId} finished → replaced with ${match.title} (${match.matchId})`);
+
+    // Push the updated match list to every connected client (reliable stream).
+    this._broadcastMatchListToAll().catch(() => { /* sessions may be closing */ });
   }
 
   // ── Private: WebTransport broadcast helpers ────────────────────────────────
@@ -203,5 +245,14 @@ export class MatchManager {
         }
       }
     }
+  }
+
+  /**
+   * Broadcasts the current match list to ALL connected sessions (not just the
+   * subscribers of one match).  Used when the set of matches changes — e.g. a
+   * completed match is replaced — so every client can subscribe to the new match.
+   */
+  async _broadcastMatchListToAll() {
+    await this._broadcastStream(this.sessions, MSG.MATCH_LIST, { matches: this.getMatchList() });
   }
 }

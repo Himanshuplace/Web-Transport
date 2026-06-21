@@ -64,10 +64,18 @@ transport.on('message', (msg) => {
     // Arrives as a datagram immediately after connecting.
     case MSG.MATCH_LIST: {
       const matches = msg.payload.matches || [];
+      const currentIds = new Set(matches.map(m => m.matchId));
+
+      // A finished match may have been replaced — drop subscriptions to any
+      // match that no longer exists so we don't keep stale state.
+      for (const oldId of transport.subscriptions) {
+        if (!currentIds.has(oldId)) transport.unsubscribe(oldId);
+      }
+
       store.setMatchList(matches);
 
-      // Subscribe to all matches automatically
-      // (in a production app you'd let the user pick)
+      // Subscribe to all current matches automatically (in a production app
+      // you'd let the user pick). Re-subscribing to a tracked match is harmless.
       for (const m of matches) {
         transport.subscribe(m.matchId);
       }

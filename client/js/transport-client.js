@@ -5,8 +5,8 @@
  *   1. Connects to the WebTransport server using the certificate fingerprint
  *      fetched from /api/server-info (required for self-signed certs).
  *   2. Opens a bidirectional stream as the "command channel" (SUBSCRIBE, etc.).
- *   3. Reads incoming unidirectional streams (BALL_EVENT, MATCH_STATUS, …).
- *   4. Reads datagrams (SCORE_UPDATE, MATCH_LIST heartbeats).
+ *   3. Reads incoming unidirectional streams (MATCH_LIST on connect, BALL_EVENT, MATCH_STATUS, …).
+ *   4. Reads datagrams (SCORE_UPDATE heartbeats).
  *   5. Reconnects with exponential backoff if the connection drops.
  *   6. Fires callbacks registered via on(event, handler).
  *
@@ -107,6 +107,9 @@ class CricketTransportClient {
 
   get isConnected() { return this._connected; }
 
+  /** Snapshot of currently-subscribed matchIds (for reconciling on MATCH_LIST). */
+  get subscriptions() { return [...this._subscriptions]; }
+
   // ── Private: connection lifecycle ─────────────────────────────────────────
 
   async _attemptConnect() {
@@ -180,7 +183,7 @@ class CricketTransportClient {
     // ── Start reading server-pushed streams (BALL_EVENT, etc.) ─────────
     this._readIncomingStreams(transport).catch(console.error);
 
-    // ── Start reading datagrams (SCORE_UPDATE, MATCH_LIST) ─────────────
+    // ── Start reading datagrams (SCORE_UPDATE) ────────────────────────
     this._readDatagrams(transport).catch(console.error);
 
     // ── Wait for close and trigger reconnect ───────────────────────────
@@ -316,7 +319,7 @@ class CricketTransportClient {
   }
 
   /**
-   * Reads WebTransport datagrams (SCORE_UPDATE, MATCH_LIST heartbeats).
+   * Reads WebTransport datagrams (SCORE_UPDATE heartbeats).
    *
    * Datagrams are UNORDERED and UNRELIABLE — a perfect fit for live score
    * tickers where missing one update is fine (the next one arrives in ~4s).

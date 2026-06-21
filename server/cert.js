@@ -78,7 +78,7 @@ export function getOrCreateCert() {
   try {
     // Step 1: Generate ECDSA P-256 private key
     execSync(
-      `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "${keyPath}" 2>/dev/null`,
+      `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "${keyPath}"`,
       { stdio: 'pipe' }
     );
 
@@ -91,8 +91,7 @@ export function getOrCreateCert() {
       `-days ${CERT_VALIDITY_DAYS} ` +
       `-subj "/CN=localhost" ` +
       `-addext "subjectAltName=DNS:localhost,IP:127.0.0.1" ` +
-      `-addext "basicConstraints=CA:false" ` +
-      `2>/dev/null`,
+      `-addext "basicConstraints=CA:false" `,
       { stdio: 'pipe' }
     );
 
@@ -132,7 +131,8 @@ export function getOrCreateCert() {
     try { fs.unlinkSync(keyPath); } catch { /* ignore */ }
     try { fs.unlinkSync(certPath); } catch { /* ignore */ }
     throw new Error(`Certificate generation failed: ${err.message}\n` +
-      'Make sure OpenSSL is installed: apt install openssl  or  brew install openssl');
+      'Make sure OpenSSL is installed and on PATH: apt install openssl (Linux), ' +
+      'brew install openssl (macOS), or winget install ShiningLight.OpenSSL (Windows).');
   }
 }
 

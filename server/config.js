@@ -7,6 +7,9 @@
  * without hunting through code.
  */
 
+import os from 'os';
+import path from 'path';
+
 // ─── Network ──────────────────────────────────────────────────────────────────
 
 // WebTransport runs on HTTP/3 which uses QUIC (UDP), NOT the usual TCP port.
@@ -30,6 +33,10 @@ export const BALL_INTERVAL_MS = 4000;
 // Pause (ms) between innings so the UI can show the innings-break screen.
 export const INNINGS_BREAK_MS = 10000;
 
+// How long (ms) a finished match stays on screen (showing its result) before it
+// is replaced by a fresh match — keeps the dashboard live indefinitely.
+export const POST_MATCH_BREAK_MS = 12000;
+
 // How many T20 matches to simulate simultaneously.
 export const MAX_CONCURRENT_MATCHES = 4;
 
@@ -45,7 +52,9 @@ export const CERT_VALIDITY_DAYS = 14;
 
 // File path to cache the generated cert so we don't regenerate on every
 // server restart (browsers would reject a new fingerprint mid-session).
-export const CERT_CACHE_PATH = '/tmp/cricket-wt-cert.json';
+// Use the OS temp dir so this works cross-platform — a hardcoded "/tmp" does
+// not exist on Windows, which breaks cert generation there.
+export const CERT_CACHE_PATH = path.join(os.tmpdir(), 'cricket-wt-cert.json');
 
 // ─── Protocol ─────────────────────────────────────────────────────────────────
 

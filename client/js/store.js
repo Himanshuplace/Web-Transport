@@ -44,7 +44,7 @@ class CricketStore {
    * Returns summary objects for all matches, always using the freshest data.
    *
    * WHY not just return `_matchList`?
-   *   `_matchList` is seeded from MATCH_LIST datagrams (summary objects).
+   *   `_matchList` is seeded from the MATCH_LIST message (summary objects).
    *   Once MATCH_STATE and SCORE_UPDATE messages arrive, the richer data lives
    *   in `_matches`.  Deriving summaries from `_matches` ensures the match
    *   tabs always show the latest run/wicket count.
@@ -91,12 +91,27 @@ class CricketStore {
 
   setMatchList(matches) {
     this._matchList = matches;
-    // Seed the map with summaries (full state arrives later via MATCH_STATE)
+
+    const incomingIds = new Set(matches.map(m => m.matchId));
+
+    // Prune matches that no longer exist (a completed match was replaced).
+    for (const id of [...this._matches.keys()]) {
+      if (!incomingIds.has(id)) this._matches.delete(id);
+    }
+
+    // Seed any new matches with their summary (full state arrives via MATCH_STATE).
     for (const m of matches) {
       if (!this._matches.has(m.matchId)) {
         this._matches.set(m.matchId, m);
       }
     }
+
+    // If the active match was just pruned, switch to another so the scorecard
+    // doesn't go blank.
+    if (this._activeMatchId && !incomingIds.has(this._activeMatchId)) {
+      this.setActiveMatch(matches[0]?.matchId || null);
+    }
+
     this._emit('matchListUpdated', matches);
   }
 

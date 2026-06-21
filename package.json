@@ -5,8 +5,11 @@
   "type": "module",
   "main": "server/index.js",
   "scripts": {
+    "gen:protocol": "node scripts/gen-client-protocol.mjs",
+    "prestart": "node scripts/gen-client-protocol.mjs",
+    "predev": "node scripts/gen-client-protocol.mjs",
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js"
+    "dev": "nodemon --ignore client/ server/index.js"
   },
   "engines": {
     "node": ">=18.0.0"
