@@ -1,0 +1,5 @@
+# Line-ending policy: normalize all text files to LF in the repository and on
+# checkout. This project runs in a Linux devcontainer, and the codegen script
+# writes LF — keeping LF everywhere avoids CRLF/LF churn and the
+# "LF will be replaced by CRLF" warnings on Windows.
+* text=auto eol=lf
