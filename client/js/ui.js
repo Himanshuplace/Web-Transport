@@ -233,8 +233,8 @@ function renderBowlingTable(inn) {
   const activeBowlers = (inn.bowlingLine || []).filter(b => b.overs > 0);
   if (activeBowlers.length === 0) return '';
 
-  const bowlRows = activeBowlers.map((b, i) => {
-    const isCurrent = i === inn.currentBowlerIdx;
+  const bowlRows = activeBowlers.map((b) => {
+    const isCurrent = inn.bowlingLine.indexOf(b) === inn.currentBowlerIdx;
     return `
       <tr class="${isCurrent ? 'bowling-now' : ''}">
         <td class="player-name">
